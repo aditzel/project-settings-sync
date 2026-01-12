@@ -2,6 +2,26 @@
   "name": "pss",
   "version": "0.1.0",
   "description": "Sync project settings (.env files) across machines using Backblaze B2",
+  "author": "Allan Ditzel",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/aditzel/project-settings-sync.git"
+  },
+  "homepage": "https://github.com/aditzel/project-settings-sync#readme",
+  "bugs": {
+    "url": "https://github.com/aditzel/project-settings-sync/issues"
+  },
+  "keywords": [
+    "env",
+    "sync",
+    "settings",
+    "backblaze",
+    "b2",
+    "encryption",
+    "cli",
+    "dotenv"
+  ],
   "type": "module",
   "bin": {
     "pss": "./bin/run.ts"
@@ -22,13 +42,25 @@
   "scripts": {
     "dev": "bun run bin/dev.ts",
     "build": "bun build ./bin/run.ts --outdir ./dist --target node",
-    "test": "vitest"
+    "test": "vitest",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "typecheck": "tsc --noEmit"
+  },
+  "engines": {
+    "node": ">=18"
   },
   "devDependencies": {
+    "@eslint/js": "^9.18.0",
     "@types/bun": "latest",
     "@types/libsodium-wrappers-sumo": "^0.7.8",
     "@types/node": "^25.0.6",
+    "eslint": "^9.18.0",
+    "prettier": "^3.4.2",
     "typescript": "^5.6.0",
+    "typescript-eslint": "^8.21.0",
     "vitest": "^4.0.16"
   },
   "dependencies": {

@@ -8,10 +8,7 @@ import { requireAuth } from "../lib/auth.ts";
 import { decrypt, getEncryptionKey, hashFile } from "../lib/crypto.ts";
 import { createB2Client, getStoragePath, getManifestPath } from "../lib/b2-client.ts";
 import { discoverEnvFiles } from "../lib/env-files.ts";
-import {
-  loadAllBaseContents,
-  updateBaseSnapshot,
-} from "../lib/base-snapshot.ts";
+import { loadAllBaseContents, updateBaseSnapshot } from "../lib/base-snapshot.ts";
 import type { ProjectManifest, EncryptedData, BaseFileEntry } from "../types/index.ts";
 
 export default class Pull extends Command {
@@ -133,19 +130,13 @@ export default class Pull extends Command {
         if (hasLocalChanges) {
           spinner.warn("Local has unpushed changes");
           this.log("");
-          this.log(
-            chalk.yellow(
-              "You have local changes that haven't been pushed yet."
-            )
-          );
+          this.log(chalk.yellow("You have local changes that haven't been pushed yet."));
           this.log("");
           this.log("Options:");
           this.log(
             `  ${chalk.cyan("pss sync")}        Merge local and remote changes (recommended)`
           );
-          this.log(
-            `  ${chalk.cyan("pss pull -f")}     Force pull and overwrite local`
-          );
+          this.log(`  ${chalk.cyan("pss pull -f")}     Force pull and overwrite local`);
           this.log("");
           return;
         }
@@ -174,11 +165,7 @@ export default class Pull extends Command {
       for (const file of filesToPull) {
         spinner.text = `Downloading ${file.name}...`;
 
-        const storagePath = getStoragePath(
-          auth.userId,
-          projectConfig.projectName,
-          file.name
-        );
+        const storagePath = getStoragePath(auth.userId, projectConfig.projectName, file.name);
 
         const encrypted = await b2.downloadJson<EncryptedData>(storagePath);
 

@@ -6,10 +6,7 @@ import { requireAuth } from "../lib/auth.ts";
 import { discoverEnvFiles } from "../lib/env-files.ts";
 import { encrypt, getEncryptionKey, hashFile } from "../lib/crypto.ts";
 import { createB2Client, getStoragePath, getManifestPath } from "../lib/b2-client.ts";
-import {
-  loadBaseSnapshot,
-  updateBaseSnapshot,
-} from "../lib/base-snapshot.ts";
+import { loadBaseSnapshot, updateBaseSnapshot } from "../lib/base-snapshot.ts";
 import type { ProjectManifest, FileEntry, BaseFileEntry } from "../types/index.ts";
 
 export default class Push extends Command {
@@ -58,11 +55,7 @@ export default class Push extends Command {
     const auth = await requireAuth();
     const encryptionKey = await getEncryptionKey(auth.userId);
 
-    let envFiles = await discoverEnvFiles(
-      projectDir,
-      projectConfig.pattern,
-      projectConfig.ignore
-    );
+    let envFiles = await discoverEnvFiles(projectDir, projectConfig.pattern, projectConfig.ignore);
 
     if (args.files) {
       const filterNames = args.files.split(",").map((f) => f.trim());
@@ -126,19 +119,11 @@ export default class Push extends Command {
       ) {
         spinner.warn("Remote has unpulled changes");
         this.log("");
-        this.log(
-          chalk.yellow(
-            "The remote has changes that you haven't pulled yet."
-          )
-        );
+        this.log(chalk.yellow("The remote has changes that you haven't pulled yet."));
         this.log("");
         this.log("Options:");
-        this.log(
-          `  ${chalk.cyan("pss sync")}        Merge local and remote changes (recommended)`
-        );
-        this.log(
-          `  ${chalk.cyan("pss push -f")}     Force push and overwrite remote`
-        );
+        this.log(`  ${chalk.cyan("pss sync")}        Merge local and remote changes (recommended)`);
+        this.log(`  ${chalk.cyan("pss push -f")}     Force push and overwrite remote`);
         this.log("");
         return;
       }
@@ -154,17 +139,11 @@ export default class Push extends Command {
 
         spinner.text = `Uploading ${file.name}...`;
 
-        const storagePath = getStoragePath(
-          auth.userId,
-          projectConfig.projectName,
-          file.name
-        );
+        const storagePath = getStoragePath(auth.userId, projectConfig.projectName, file.name);
 
         await b2.uploadJson(storagePath, encrypted);
 
-        const existingIndex = manifest.files.findIndex(
-          (f) => f.name === file.name
-        );
+        const existingIndex = manifest.files.findIndex((f) => f.name === file.name);
 
         const entry: FileEntry = {
           name: file.name,

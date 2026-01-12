@@ -51,9 +51,7 @@ export default class Init extends Command {
 
     const existing = await loadProjectConfig(projectDir);
     if (existing && !flags.force) {
-      this.log(
-        `${chalk.yellow("!")} Project already initialized as "${existing.projectName}"`
-      );
+      this.log(`${chalk.yellow("!")} Project already initialized as "${existing.projectName}"`);
       this.log("Use --force to reinitialize.");
       return;
     }
@@ -111,28 +109,20 @@ export default class Init extends Command {
     try {
       await access(gitignorePath);
       content = await readFile(gitignorePath, "utf-8");
-      existingEntries = new Set(
-        content.split("\n").map((line) => line.trim())
-      );
+      existingEntries = new Set(content.split("\n").map((line) => line.trim()));
     } catch {
       // .gitignore doesn't exist, we'll create it
     }
 
     // Check which entries need to be added
-    const newEntries = entriesToAdd.filter(
-      (entry) => !existingEntries.has(entry)
-    );
+    const newEntries = entriesToAdd.filter((entry) => !existingEntries.has(entry));
 
     if (newEntries.length === 0) {
       return false;
     }
 
     // Add pss section to gitignore
-    const section = [
-      "",
-      "# Project Settings Sync",
-      ...newEntries,
-    ].join("\n");
+    const section = ["", "# Project Settings Sync", ...newEntries].join("\n");
 
     const newContent = content.trimEnd() + section + "\n";
     await writeFile(gitignorePath, newContent);

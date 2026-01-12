@@ -28,8 +28,7 @@ import type {
 } from "../types/index.ts";
 
 export default class Sync extends Command {
-  static override description =
-    "Intelligently sync .env files with remote, handling conflicts";
+  static override description = "Intelligently sync .env files with remote, handling conflicts";
 
   static override examples = [
     "<%= config.bin %> sync",
@@ -121,11 +120,7 @@ export default class Sync extends Command {
 
       if (manifest) {
         for (const file of manifest.files) {
-          const storagePath = getStoragePath(
-            auth.userId,
-            projectConfig.projectName,
-            file.name
-          );
+          const storagePath = getStoragePath(auth.userId, projectConfig.projectName, file.name);
           try {
             const encrypted = await b2.downloadJson<EncryptedData>(storagePath);
             const content = await decrypt(encrypted, encryptionKey);
@@ -169,14 +164,9 @@ export default class Sync extends Command {
 
       // 6. Handle conflicts
       if (syncResult.hasConflicts) {
-        const conflictCount = mergeResults.reduce(
-          (acc, r) => acc + r.conflicts.length,
-          0
-        );
+        const conflictCount = mergeResults.reduce((acc, r) => acc + r.conflicts.length, 0);
         this.log("");
-        this.log(
-          chalk.yellow(`Found ${conflictCount} conflict(s) requiring resolution.`)
-        );
+        this.log(chalk.yellow(`Found ${conflictCount} conflict(s) requiring resolution.`));
 
         if (flags.ours) {
           this.log(chalk.dim("Resolving all conflicts using local values (--ours)"));
@@ -223,17 +213,13 @@ export default class Sync extends Command {
           this.log(
             `Use ${chalk.cyan("--ours")} or ${chalk.cyan("--theirs")} to resolve all conflicts automatically.`
           );
-          this.log(
-            chalk.dim("Interactive TUI conflict resolution coming soon!")
-          );
+          this.log(chalk.dim("Interactive TUI conflict resolution coming soon!"));
           return;
         }
       }
 
       // 7. Check if there are any changes to apply
-      const hasChanges = mergeResults.some(
-        (r) => r.status !== "clean" || r.autoMerged.length > 0
-      );
+      const hasChanges = mergeResults.some((r) => r.status !== "clean" || r.autoMerged.length > 0);
 
       if (!hasChanges) {
         this.log("");
@@ -283,11 +269,7 @@ export default class Sync extends Command {
 
         spinner.text = `Uploading ${result.fileName}...`;
         const encrypted = await encrypt(content, encryptionKey);
-        const storagePath = getStoragePath(
-          auth.userId,
-          projectConfig.projectName,
-          result.fileName
-        );
+        const storagePath = getStoragePath(auth.userId, projectConfig.projectName, result.fileName);
         await b2.uploadJson(storagePath, encrypted);
 
         newManifest.files.push({
@@ -350,9 +332,7 @@ export default class Sync extends Command {
       }
 
       if (result.conflicts.length > 0) {
-        this.log(
-          chalk.red(`      ${result.conflicts.length} conflict(s)`)
-        );
+        this.log(chalk.red(`      ${result.conflicts.length} conflict(s)`));
       }
     }
   }

@@ -60,9 +60,7 @@ export function hasPssDir(projectDir: string): boolean {
 /**
  * Load the base snapshot metadata
  */
-export async function loadBaseSnapshot(
-  projectDir: string
-): Promise<BaseSnapshot | null> {
+export async function loadBaseSnapshot(projectDir: string): Promise<BaseSnapshot | null> {
   try {
     const snapshotPath = getSnapshotPath(projectDir);
     const content = await readFile(snapshotPath, "utf-8");
@@ -75,10 +73,7 @@ export async function loadBaseSnapshot(
 /**
  * Save the base snapshot metadata
  */
-export async function saveBaseSnapshot(
-  projectDir: string,
-  snapshot: BaseSnapshot
-): Promise<void> {
+export async function saveBaseSnapshot(projectDir: string, snapshot: BaseSnapshot): Promise<void> {
   await ensurePssDir(projectDir);
   const snapshotPath = getSnapshotPath(projectDir);
   await writeFile(snapshotPath, JSON.stringify(snapshot, null, 2));
@@ -115,10 +110,7 @@ export async function saveBaseFileContent(
 /**
  * Delete a base file
  */
-export async function deleteBaseFile(
-  projectDir: string,
-  fileName: string
-): Promise<void> {
+export async function deleteBaseFile(projectDir: string, fileName: string): Promise<void> {
   try {
     const filePath = getBaseFilePath(projectDir, fileName);
     await rm(filePath);
@@ -162,9 +154,7 @@ export async function updateBaseSnapshot(
  * Load all base file contents from the snapshot.
  * Returns a map of fileName -> content for use in three-way merge.
  */
-export async function loadAllBaseContents(
-  projectDir: string
-): Promise<Map<string, string>> {
+export async function loadAllBaseContents(projectDir: string): Promise<Map<string, string>> {
   const contents = new Map<string, string>();
   const snapshot = await loadBaseSnapshot(projectDir);
 
@@ -195,9 +185,7 @@ export async function clearBaseSnapshot(projectDir: string): Promise<void> {
 /**
  * Check if we have a valid base snapshot for comparison
  */
-export async function hasValidBaseSnapshot(
-  projectDir: string
-): Promise<boolean> {
+export async function hasValidBaseSnapshot(projectDir: string): Promise<boolean> {
   const snapshot = await loadBaseSnapshot(projectDir);
   if (!snapshot) return false;
 

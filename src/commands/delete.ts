@@ -60,7 +60,9 @@ export default class Delete extends Command {
     if (flags.project) {
       if (!flags.force) {
         this.log(
-          chalk.red(`⚠️  This will delete all remote files for project "${projectConfig.projectName}"`)
+          chalk.red(
+            `⚠️  This will delete all remote files for project "${projectConfig.projectName}"`
+          )
         );
         this.log("Use --force to confirm deletion.");
         return;
@@ -113,11 +115,7 @@ export default class Delete extends Command {
       let deleted = 0;
 
       for (const fileName of filesToDelete) {
-        const storagePath = getStoragePath(
-          auth.userId,
-          projectConfig.projectName,
-          fileName
-        );
+        const storagePath = getStoragePath(auth.userId, projectConfig.projectName, fileName);
 
         try {
           await b2.delete(storagePath);

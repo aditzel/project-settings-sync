@@ -67,10 +67,7 @@ export async function getOrCreateGlobalConfig(): Promise<GlobalConfig> {
   return defaultConfig;
 }
 
-export async function setConfigValue(
-  key: string,
-  value: string
-): Promise<void> {
+export async function setConfigValue(key: string, value: string): Promise<void> {
   const config = await getOrCreateGlobalConfig();
 
   const parts = key.split(".");
@@ -123,9 +120,7 @@ export async function clearAuthData(): Promise<void> {
   }
 }
 
-export async function loadProjectConfig(
-  projectDir: string
-): Promise<ProjectConfig | null> {
+export async function loadProjectConfig(projectDir: string): Promise<ProjectConfig | null> {
   try {
     const configPath = join(projectDir, ".pss.json");
     const content = await readFile(configPath, "utf-8");
@@ -135,10 +130,7 @@ export async function loadProjectConfig(
   }
 }
 
-export async function saveProjectConfig(
-  projectDir: string,
-  config: ProjectConfig
-): Promise<void> {
+export async function saveProjectConfig(projectDir: string, config: ProjectConfig): Promise<void> {
   const configPath = join(projectDir, ".pss.json");
   await writeFile(configPath, JSON.stringify(config, null, 2));
 }

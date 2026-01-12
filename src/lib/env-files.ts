@@ -136,10 +136,7 @@ function formatEnvValue(value: string): string {
   }
 
   // Use double quotes and escape internal double quotes and backslashes
-  const escaped = value
-    .replace(/\\/g, "\\\\")
-    .replace(/"/g, '\\"')
-    .replace(/\n/g, "\\n");
+  const escaped = value.replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/\n/g, "\\n");
 
   return `"${escaped}"`;
 }

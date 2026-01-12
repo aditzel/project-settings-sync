@@ -15,10 +15,7 @@ async function ensureSodium(): Promise<void> {
 export async function deriveKeyFromUserId(userId: string): Promise<Uint8Array> {
   await ensureSodium();
 
-  const salt = sodium.crypto_generichash(
-    sodium.crypto_pwhash_SALTBYTES,
-    APP_SALT
-  );
+  const salt = sodium.crypto_generichash(sodium.crypto_pwhash_SALTBYTES, APP_SALT);
 
   return sodium.crypto_pwhash(
     sodium.crypto_secretbox_KEYBYTES,
@@ -30,10 +27,7 @@ export async function deriveKeyFromUserId(userId: string): Promise<Uint8Array> {
   );
 }
 
-export async function encrypt(
-  plaintext: string,
-  key: Uint8Array
-): Promise<EncryptedData> {
+export async function encrypt(plaintext: string, key: Uint8Array): Promise<EncryptedData> {
   await ensureSodium();
 
   const nonce = sodium.randombytes_buf(sodium.crypto_secretbox_NONCEBYTES);
@@ -49,10 +43,7 @@ export async function encrypt(
   };
 }
 
-export async function decrypt(
-  encrypted: EncryptedData,
-  key: Uint8Array
-): Promise<string> {
+export async function decrypt(encrypted: EncryptedData, key: Uint8Array): Promise<string> {
   await ensureSodium();
 
   if (encrypted.version !== 1) {

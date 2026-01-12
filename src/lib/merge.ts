@@ -144,11 +144,7 @@ export function threeWayMergeEnvFile(
   const autoMerged: AutoMergeEntry[] = [];
 
   // Collect all keys from all three versions
-  const allKeys = new Set([
-    ...(base?.keys() ?? []),
-    ...local.keys(),
-    ...remote.keys(),
-  ]);
+  const allKeys = new Set([...(base?.keys() ?? []), ...local.keys(), ...remote.keys()]);
 
   for (const key of allKeys) {
     const baseVal = base?.get(key);
@@ -189,12 +185,7 @@ export function threeWayMergeEnvFile(
 
   return {
     fileName,
-    status:
-      conflicts.length > 0
-        ? "conflicted"
-        : autoMerged.length > 0
-          ? "auto_merged"
-          : "clean",
+    status: conflicts.length > 0 ? "conflicted" : autoMerged.length > 0 ? "auto_merged" : "clean",
     merged,
     conflicts,
     autoMerged,

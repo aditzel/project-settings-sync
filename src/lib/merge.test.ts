@@ -217,9 +217,7 @@ describe("applyResolutions", () => {
       new Map([["KEY", "remote"]])
     );
 
-    const resolved = applyResolutions(mergeResult, [
-      { key: "KEY", choice: "local" },
-    ]);
+    const resolved = applyResolutions(mergeResult, [{ key: "KEY", choice: "local" }]);
 
     expect(resolved.get("KEY")).toBe("local");
   });
@@ -232,9 +230,7 @@ describe("applyResolutions", () => {
       new Map([["KEY", "remote"]])
     );
 
-    const resolved = applyResolutions(mergeResult, [
-      { key: "KEY", choice: "remote" },
-    ]);
+    const resolved = applyResolutions(mergeResult, [{ key: "KEY", choice: "remote" }]);
 
     expect(resolved.get("KEY")).toBe("remote");
   });
@@ -247,9 +243,7 @@ describe("applyResolutions", () => {
       new Map([["KEY", "remote"]])
     );
 
-    const resolved = applyResolutions(mergeResult, [
-      { key: "KEY", choice: "base" },
-    ]);
+    const resolved = applyResolutions(mergeResult, [{ key: "KEY", choice: "base" }]);
 
     expect(resolved.get("KEY")).toBe("base");
   });

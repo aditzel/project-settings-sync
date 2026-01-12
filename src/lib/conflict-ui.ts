@@ -1,10 +1,6 @@
 import * as readline from "node:readline";
 import chalk from "chalk";
-import type {
-  ConflictEntry,
-  ConflictResolution,
-  ResolutionChoice,
-} from "../types/index.ts";
+import type { ConflictEntry, ConflictResolution, ResolutionChoice } from "../types/index.ts";
 
 /**
  * Simple readline-based conflict resolution UI.
@@ -38,10 +34,7 @@ export class ConflictUI {
   /**
    * Display a conflict and get user resolution.
    */
-  async resolveConflict(
-    fileName: string,
-    conflict: ConflictEntry
-  ): Promise<ConflictResolution> {
+  async resolveConflict(fileName: string, conflict: ConflictEntry): Promise<ConflictResolution> {
     console.log("");
     console.log(chalk.bold("━".repeat(50)));
     console.log(chalk.bold(`  Conflict: ${fileName} → ${conflict.key}`));

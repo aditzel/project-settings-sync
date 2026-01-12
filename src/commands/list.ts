@@ -69,7 +69,11 @@ export default class List extends Command {
     }
 
     const localFiles = !flags.remote
-      ? await discoverEnvFiles(projectDir, projectConfig?.pattern || ".env*", projectConfig?.ignore || [])
+      ? await discoverEnvFiles(
+          projectDir,
+          projectConfig?.pattern || ".env*",
+          projectConfig?.ignore || []
+        )
       : [];
 
     let remoteFiles: Array<{ name: string; size: number; updatedAt: string }> = [];
@@ -111,7 +115,9 @@ export default class List extends Command {
       for (const file of remoteFiles) {
         const isLocal = localFiles.some((l) => l.name === file.name);
         const status = isLocal ? chalk.green("✓") : chalk.blue("↓");
-        this.log(`  ${status} ${file.name} (${formatBytes(file.size)}) - ${formatDate(file.updatedAt)}`);
+        this.log(
+          `  ${status} ${file.name} (${formatBytes(file.size)}) - ${formatDate(file.updatedAt)}`
+        );
       }
       this.log("");
     }

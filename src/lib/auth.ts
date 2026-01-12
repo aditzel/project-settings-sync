@@ -1,9 +1,4 @@
-import {
-  loadGlobalConfig,
-  loadAuthData,
-  saveAuthData,
-  clearAuthData,
-} from "./config.ts";
+import { loadGlobalConfig, loadAuthData, saveAuthData, clearAuthData } from "./config.ts";
 import type { AuthData } from "../types/index.ts";
 import { createServer } from "node:http";
 import type { Socket } from "node:net";
@@ -97,14 +92,9 @@ function buildAuthUrl(clientId: string, state: string, codeChallenge: string): s
 
 function openBrowser(url: string): void {
   const command =
-    process.platform === "darwin"
-      ? "open"
-      : process.platform === "win32"
-        ? "cmd"
-        : "xdg-open";
+    process.platform === "darwin" ? "open" : process.platform === "win32" ? "cmd" : "xdg-open";
 
-  const args =
-    process.platform === "win32" ? ["/c", "start", "", url] : [url];
+  const args = process.platform === "win32" ? ["/c", "start", "", url] : [url];
 
   spawn(command, args, { stdio: "ignore", detached: true }).unref();
 }
@@ -194,10 +184,13 @@ async function waitForAuthCode(expectedState: string): Promise<string> {
     });
 
     // Timeout after 5 minutes
-    const timeoutId = setTimeout(() => {
-      closeServer();
-      reject(new Error("Authorization timed out"));
-    }, 5 * 60 * 1000);
+    const timeoutId = setTimeout(
+      () => {
+        closeServer();
+        reject(new Error("Authorization timed out"));
+      },
+      5 * 60 * 1000
+    );
 
     // Helper to close server and destroy all connections
     const closeServer = () => {

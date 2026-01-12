@@ -83,11 +83,7 @@ export default class Diff extends Command {
         continue;
       }
 
-      const storagePath = getStoragePath(
-        auth.userId,
-        projectConfig.projectName,
-        localFile.name
-      );
+      const storagePath = getStoragePath(auth.userId, projectConfig.projectName, localFile.name);
 
       try {
         const encrypted = await b2.downloadJson<EncryptedData>(storagePath);
