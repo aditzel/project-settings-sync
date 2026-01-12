@@ -5,9 +5,14 @@ import chalk from "chalk";
 import ora from "ora";
 import { loadProjectConfig, loadGlobalConfig, saveProjectConfig } from "../lib/config.ts";
 import { requireAuth } from "../lib/auth.ts";
-import { decrypt, getEncryptionKey } from "../lib/crypto.ts";
+import { decrypt, getEncryptionKey, hashFile } from "../lib/crypto.ts";
 import { createB2Client, getStoragePath, getManifestPath } from "../lib/b2-client.ts";
-import type { ProjectManifest, EncryptedData } from "../types/index.ts";
+import { discoverEnvFiles } from "../lib/env-files.ts";
+import {
+  loadAllBaseContents,
+  updateBaseSnapshot,
+} from "../lib/base-snapshot.ts";
+import type { ProjectManifest, EncryptedData, BaseFileEntry } from "../types/index.ts";
 
 export default class Pull extends Command {
   static override description = "Pull .env files from remote storage";
@@ -32,7 +37,7 @@ export default class Pull extends Command {
     }),
     force: Flags.boolean({
       char: "f",
-      description: "Overwrite local files without confirmation",
+      description: "Pull even if local has unpushed changes",
       default: false,
     }),
     backup: Flags.boolean({
@@ -97,6 +102,55 @@ export default class Pull extends Command {
         return;
       }
 
+      // Check if local has unpushed changes
+      spinner.text = "Checking for local changes...";
+      const baseContents = await loadAllBaseContents(projectDir);
+      const localFiles = await discoverEnvFiles(
+        projectDir,
+        projectConfig.pattern,
+        projectConfig.ignore
+      );
+
+      if (baseContents.size > 0 && !flags.force) {
+        let hasLocalChanges = false;
+
+        for (const localFile of localFiles) {
+          const baseContent = baseContents.get(localFile.name);
+          if (baseContent !== undefined) {
+            const localHash = await hashFile(localFile.content);
+            const baseHash = await hashFile(baseContent);
+            if (localHash !== baseHash) {
+              hasLocalChanges = true;
+              break;
+            }
+          } else {
+            // New local file not in base = local change
+            hasLocalChanges = true;
+            break;
+          }
+        }
+
+        if (hasLocalChanges) {
+          spinner.warn("Local has unpushed changes");
+          this.log("");
+          this.log(
+            chalk.yellow(
+              "You have local changes that haven't been pushed yet."
+            )
+          );
+          this.log("");
+          this.log("Options:");
+          this.log(
+            `  ${chalk.cyan("pss sync")}        Merge local and remote changes (recommended)`
+          );
+          this.log(
+            `  ${chalk.cyan("pss pull -f")}     Force pull and overwrite local`
+          );
+          this.log("");
+          return;
+        }
+      }
+
       spinner.stop();
 
       this.log(chalk.bold(`Pulling ${filesToPull.length} file(s):\n`));
@@ -115,6 +169,7 @@ export default class Pull extends Command {
       spinner.start("Downloading files...");
 
       let downloaded = 0;
+      const baseFiles: BaseFileEntry[] = [];
 
       for (const file of filesToPull) {
         spinner.text = `Downloading ${file.name}...`;
@@ -144,8 +199,21 @@ export default class Pull extends Command {
         }
 
         await writeFile(localPath, content);
+
+        // Track for base snapshot
+        baseFiles.push({
+          name: file.name,
+          hash: file.hash,
+          content,
+        });
+
         downloaded++;
       }
+
+      // Update base snapshot to track what we pulled
+      spinner.text = "Updating base snapshot...";
+      const manifestHash = await hashFile(JSON.stringify(manifest));
+      await updateBaseSnapshot(projectDir, baseFiles, manifestHash);
 
       projectConfig.lastSync = new Date().toISOString();
       await saveProjectConfig(projectDir, projectConfig);

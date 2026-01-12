@@ -6,7 +6,11 @@ import { requireAuth } from "../lib/auth.ts";
 import { discoverEnvFiles } from "../lib/env-files.ts";
 import { encrypt, getEncryptionKey, hashFile } from "../lib/crypto.ts";
 import { createB2Client, getStoragePath, getManifestPath } from "../lib/b2-client.ts";
-import type { ProjectManifest, FileEntry } from "../types/index.ts";
+import {
+  loadBaseSnapshot,
+  updateBaseSnapshot,
+} from "../lib/base-snapshot.ts";
+import type { ProjectManifest, FileEntry, BaseFileEntry } from "../types/index.ts";
 
 export default class Push extends Command {
   static override description = "Push .env files to remote storage";
@@ -31,7 +35,7 @@ export default class Push extends Command {
     }),
     force: Flags.boolean({
       char: "f",
-      description: "Skip confirmation prompts",
+      description: "Push even if remote has unpulled changes",
       default: false,
     }),
   };
@@ -97,9 +101,11 @@ export default class Push extends Command {
 
       const manifestPath = getManifestPath(auth.userId, projectConfig.projectName);
       let manifest: ProjectManifest;
+      let remoteManifestHash: string | null = null;
 
       try {
         manifest = await b2.downloadJson<ProjectManifest>(manifestPath);
+        remoteManifestHash = await hashFile(JSON.stringify(manifest));
       } catch {
         manifest = {
           version: 1,
@@ -108,7 +114,37 @@ export default class Push extends Command {
         };
       }
 
+      // Check if remote has changed since last sync
+      spinner.text = "Checking for remote changes...";
+      const baseSnapshot = await loadBaseSnapshot(projectDir);
+
+      if (
+        baseSnapshot &&
+        remoteManifestHash &&
+        baseSnapshot.remoteManifestHash !== remoteManifestHash &&
+        !flags.force
+      ) {
+        spinner.warn("Remote has unpulled changes");
+        this.log("");
+        this.log(
+          chalk.yellow(
+            "The remote has changes that you haven't pulled yet."
+          )
+        );
+        this.log("");
+        this.log("Options:");
+        this.log(
+          `  ${chalk.cyan("pss sync")}        Merge local and remote changes (recommended)`
+        );
+        this.log(
+          `  ${chalk.cyan("pss push -f")}     Force push and overwrite remote`
+        );
+        this.log("");
+        return;
+      }
+
       let uploaded = 0;
+      const baseFiles: BaseFileEntry[] = [];
 
       for (const file of envFiles) {
         spinner.text = `Encrypting ${file.name}...`;
@@ -143,11 +179,23 @@ export default class Push extends Command {
           manifest.files.push(entry);
         }
 
+        // Track for base snapshot
+        baseFiles.push({
+          name: file.name,
+          hash,
+          content: file.content,
+        });
+
         uploaded++;
       }
 
       spinner.text = "Updating manifest...";
       await b2.uploadJson(manifestPath, manifest);
+
+      // Update base snapshot to track what we pushed
+      spinner.text = "Updating base snapshot...";
+      const newManifestHash = await hashFile(JSON.stringify(manifest));
+      await updateBaseSnapshot(projectDir, baseFiles, newManifestHash);
 
       projectConfig.lastSync = new Date().toISOString();
       await saveProjectConfig(projectDir, projectConfig);

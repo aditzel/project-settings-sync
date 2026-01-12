@@ -6,6 +6,7 @@ import {
 } from "./config.ts";
 import type { AuthData } from "../types/index.ts";
 import { createServer } from "node:http";
+import type { Socket } from "node:net";
 import { URL } from "node:url";
 import { spawn } from "node:child_process";
 
@@ -110,6 +111,8 @@ function openBrowser(url: string): void {
 
 async function waitForAuthCode(expectedState: string): Promise<string> {
   return new Promise((resolve, reject) => {
+    const connections = new Set<Socket>();
+
     const server = createServer((req, res) => {
       const url = new URL(req.url || "/", `http://localhost:${REDIRECT_PORT}`);
 
@@ -134,7 +137,7 @@ async function waitForAuthCode(expectedState: string): Promise<string> {
             </body>
           </html>
         `);
-        server.close();
+        closeServer();
         reject(new Error(`Authorization failed: ${error}`));
         return;
       }
@@ -149,7 +152,7 @@ async function waitForAuthCode(expectedState: string): Promise<string> {
             </body>
           </html>
         `);
-        server.close();
+        closeServer();
         reject(new Error("Invalid state parameter"));
         return;
       }
@@ -164,7 +167,7 @@ async function waitForAuthCode(expectedState: string): Promise<string> {
             </body>
           </html>
         `);
-        server.close();
+        closeServer();
         reject(new Error("No authorization code received"));
         return;
       }
@@ -180,23 +183,37 @@ async function waitForAuthCode(expectedState: string): Promise<string> {
         </html>
       `);
 
-      server.close();
+      closeServer();
       resolve(code);
     });
+
+    // Track connections for cleanup
+    server.on("connection", (conn) => {
+      connections.add(conn);
+      conn.on("close", () => connections.delete(conn));
+    });
+
+    // Timeout after 5 minutes
+    const timeoutId = setTimeout(() => {
+      closeServer();
+      reject(new Error("Authorization timed out"));
+    }, 5 * 60 * 1000);
+
+    // Helper to close server and destroy all connections
+    const closeServer = () => {
+      clearTimeout(timeoutId);
+      connections.forEach((conn) => conn.destroy());
+      server.close();
+    };
 
     server.listen(REDIRECT_PORT, "127.0.0.1", () => {
       // Server is ready
     });
 
     server.on("error", (err) => {
+      clearTimeout(timeoutId);
       reject(new Error(`Failed to start auth server: ${err.message}`));
     });
-
-    // Timeout after 5 minutes
-    setTimeout(() => {
-      server.close();
-      reject(new Error("Authorization timed out"));
-    }, 5 * 60 * 1000);
   });
 }
 

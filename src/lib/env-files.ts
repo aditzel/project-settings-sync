@@ -95,3 +95,51 @@ export function diffEnvFiles(
 
   return { added, removed, changed };
 }
+
+/**
+ * Serialize a Map of env variables back to env file format.
+ * Values containing spaces or special characters are quoted.
+ */
+export function serializeEnvFile(vars: Map<string, string>): string {
+  const lines: string[] = [];
+
+  // Sort keys for consistent output
+  const sortedKeys = Array.from(vars.keys()).sort();
+
+  for (const key of sortedKeys) {
+    const value = vars.get(key)!;
+    const formattedValue = formatEnvValue(value);
+    lines.push(`${key}=${formattedValue}`);
+  }
+
+  return lines.join("\n") + "\n";
+}
+
+/**
+ * Format a value for env file output.
+ * Quotes values that contain spaces, quotes, or special characters.
+ */
+function formatEnvValue(value: string): string {
+  // Check if value needs quoting
+  const needsQuoting =
+    value.includes(" ") ||
+    value.includes('"') ||
+    value.includes("'") ||
+    value.includes("#") ||
+    value.includes("$") ||
+    value.includes("\n") ||
+    value.includes("\\") ||
+    value === "";
+
+  if (!needsQuoting) {
+    return value;
+  }
+
+  // Use double quotes and escape internal double quotes and backslashes
+  const escaped = value
+    .replace(/\\/g, "\\\\")
+    .replace(/"/g, '\\"')
+    .replace(/\n/g, "\\n");
+
+  return `"${escaped}"`;
+}

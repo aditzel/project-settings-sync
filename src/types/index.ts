@@ -54,3 +54,77 @@ export const DEFAULT_B2_CONFIG = {
   bucket: "project-settings-sync",
   region: "us-east-005",
 } as const;
+
+// ============================================
+// Base Snapshot Types (for three-way merge)
+// ============================================
+
+/**
+ * Stores the "base" state of env files after the last successful sync.
+ * Used for three-way merge to detect true conflicts vs auto-mergeable changes.
+ */
+export interface BaseSnapshot {
+  version: number;
+  files: BaseFileEntry[];
+  syncedAt: string;
+  remoteManifestHash: string;
+}
+
+export interface BaseFileEntry {
+  name: string;
+  hash: string;
+  content: string;
+}
+
+// ============================================
+// Merge Result Types
+// ============================================
+
+export type ConflictType = "divergent_edit" | "edit_vs_delete" | "new_key_collision";
+
+export type AutoMergeAction =
+  | "added_from_local"
+  | "added_from_remote"
+  | "deleted"
+  | "updated_from_local"
+  | "updated_from_remote";
+
+export interface ConflictEntry {
+  key: string;
+  conflictType: ConflictType;
+  baseValue?: string;
+  localValue?: string;
+  remoteValue?: string;
+}
+
+export interface AutoMergeEntry {
+  key: string;
+  action: AutoMergeAction;
+  value?: string;
+}
+
+export interface FileMergeResult {
+  fileName: string;
+  status: "clean" | "auto_merged" | "conflicted";
+  merged: Map<string, string>;
+  conflicts: ConflictEntry[];
+  autoMerged: AutoMergeEntry[];
+}
+
+export interface SyncResult {
+  files: FileMergeResult[];
+  hasConflicts: boolean;
+  requiresUserAction: boolean;
+}
+
+// ============================================
+// Conflict Resolution Types
+// ============================================
+
+export type ResolutionChoice = "local" | "remote" | "base" | "manual" | "skip";
+
+export interface ConflictResolution {
+  key: string;
+  choice: ResolutionChoice;
+  manualValue?: string;
+}

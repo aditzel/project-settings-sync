@@ -1,8 +1,10 @@
 import { Command, Args, Flags } from "@oclif/core";
-import { basename } from "node:path";
+import { basename, join } from "node:path";
+import { readFile, writeFile, access } from "node:fs/promises";
 import chalk from "chalk";
 import { loadProjectConfig, saveProjectConfig } from "../lib/config.ts";
 import { discoverEnvFiles } from "../lib/env-files.ts";
+import { ensurePssDir } from "../lib/base-snapshot.ts";
 import type { ProjectConfig } from "../types/index.ts";
 
 export default class Init extends Command {
@@ -67,6 +69,12 @@ export default class Init extends Command {
 
     await saveProjectConfig(projectDir, config);
 
+    // Create .pss/ directory for base snapshots
+    await ensurePssDir(projectDir);
+
+    // Update .gitignore
+    const gitignoreUpdated = await this.updateGitignore(projectDir);
+
     this.log(chalk.green("✓") + ` Initialized project "${chalk.cyan(projectName)}"`);
     this.log("");
 
@@ -84,5 +92,51 @@ export default class Init extends Command {
 
     this.log("");
     this.log(chalk.dim("Config saved to .pss.json"));
+    if (gitignoreUpdated) {
+      this.log(chalk.dim("Updated .gitignore with .pss/ and .env entries"));
+    }
+  }
+
+  /**
+   * Update .gitignore to include .pss/ directory and .env files
+   */
+  private async updateGitignore(projectDir: string): Promise<boolean> {
+    const gitignorePath = join(projectDir, ".gitignore");
+    const entriesToAdd = [".pss/", ".env*", "!.env.example"];
+
+    let content = "";
+    let existingEntries = new Set<string>();
+
+    // Try to read existing .gitignore
+    try {
+      await access(gitignorePath);
+      content = await readFile(gitignorePath, "utf-8");
+      existingEntries = new Set(
+        content.split("\n").map((line) => line.trim())
+      );
+    } catch {
+      // .gitignore doesn't exist, we'll create it
+    }
+
+    // Check which entries need to be added
+    const newEntries = entriesToAdd.filter(
+      (entry) => !existingEntries.has(entry)
+    );
+
+    if (newEntries.length === 0) {
+      return false;
+    }
+
+    // Add pss section to gitignore
+    const section = [
+      "",
+      "# Project Settings Sync",
+      ...newEntries,
+    ].join("\n");
+
+    const newContent = content.trimEnd() + section + "\n";
+    await writeFile(gitignorePath, newContent);
+
+    return true;
   }
 }
