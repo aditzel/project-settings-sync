@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   threeWayMergeEnvFile,
+  threeWayMergeTextFile,
   applyResolutions,
   resolveAllConflicts,
   getAutoMergeSummary,
@@ -217,9 +218,9 @@ describe("applyResolutions", () => {
       new Map([["KEY", "remote"]])
     );
 
-    const resolved = applyResolutions(mergeResult, [{ key: "KEY", choice: "local" }]);
+    applyResolutions(mergeResult, [{ key: "KEY", choice: "local" }]);
 
-    expect(resolved.get("KEY")).toBe("local");
+    expect(mergeResult.merged.get("KEY")).toBe("local");
   });
 
   it("should apply remote resolution", () => {
@@ -230,9 +231,9 @@ describe("applyResolutions", () => {
       new Map([["KEY", "remote"]])
     );
 
-    const resolved = applyResolutions(mergeResult, [{ key: "KEY", choice: "remote" }]);
+    applyResolutions(mergeResult, [{ key: "KEY", choice: "remote" }]);
 
-    expect(resolved.get("KEY")).toBe("remote");
+    expect(mergeResult.merged.get("KEY")).toBe("remote");
   });
 
   it("should apply base resolution", () => {
@@ -243,9 +244,9 @@ describe("applyResolutions", () => {
       new Map([["KEY", "remote"]])
     );
 
-    const resolved = applyResolutions(mergeResult, [{ key: "KEY", choice: "base" }]);
+    applyResolutions(mergeResult, [{ key: "KEY", choice: "base" }]);
 
-    expect(resolved.get("KEY")).toBe("base");
+    expect(mergeResult.merged.get("KEY")).toBe("base");
   });
 
   it("should apply manual resolution", () => {
@@ -256,11 +257,9 @@ describe("applyResolutions", () => {
       new Map([["KEY", "remote"]])
     );
 
-    const resolved = applyResolutions(mergeResult, [
-      { key: "KEY", choice: "manual", manualValue: "custom" },
-    ]);
+    applyResolutions(mergeResult, [{ key: "KEY", choice: "manual", manualValue: "custom" }]);
 
-    expect(resolved.get("KEY")).toBe("custom");
+    expect(mergeResult.merged.get("KEY")).toBe("custom");
   });
 
   it("should handle deletion via resolution", () => {
@@ -271,11 +270,9 @@ describe("applyResolutions", () => {
       new Map([["KEY", "remote"]])
     );
 
-    const resolved = applyResolutions(mergeResult, [
-      { key: "KEY", choice: "local" }, // choose deletion
-    ]);
+    applyResolutions(mergeResult, [{ key: "KEY", choice: "local" }]);
 
-    expect(resolved.has("KEY")).toBe(false);
+    expect(mergeResult.merged.has("KEY")).toBe(false);
   });
 });
 
@@ -298,10 +295,10 @@ describe("resolveAllConflicts", () => {
     );
 
     const resolutions = resolveAllConflicts(mergeResult, "local");
-    const resolved = applyResolutions(mergeResult, resolutions);
+    applyResolutions(mergeResult, resolutions);
 
-    expect(resolved.get("KEY1")).toBe("local1");
-    expect(resolved.get("KEY2")).toBe("local2");
+    expect(mergeResult.merged.get("KEY1")).toBe("local1");
+    expect(mergeResult.merged.get("KEY2")).toBe("local2");
   });
 
   it("should resolve all conflicts with remote strategy", () => {
@@ -322,10 +319,10 @@ describe("resolveAllConflicts", () => {
     );
 
     const resolutions = resolveAllConflicts(mergeResult, "remote");
-    const resolved = applyResolutions(mergeResult, resolutions);
+    applyResolutions(mergeResult, resolutions);
 
-    expect(resolved.get("KEY1")).toBe("remote1");
-    expect(resolved.get("KEY2")).toBe("remote2");
+    expect(mergeResult.merged.get("KEY1")).toBe("remote1");
+    expect(mergeResult.merged.get("KEY2")).toBe("remote2");
   });
 });
 
@@ -350,5 +347,22 @@ describe("getAutoMergeSummary", () => {
     expect(summary).toContain("+ ADDED (from local)");
     expect(summary).toContain("- DELETED (deleted)");
     expect(summary).toContain("~ UPDATED (updated from local)");
+  });
+});
+
+describe("threeWayMergeTextFile", () => {
+  it("should merge when only local changes", () => {
+    const result = threeWayMergeTextFile("config.json", "base", "local", "base");
+
+    expect(result.status).toBe("auto_merged");
+    expect(result.mergedContent).toBe("local");
+  });
+
+  it("should detect conflicts on divergent edits", () => {
+    const result = threeWayMergeTextFile("config.json", "base", "local", "remote");
+
+    expect(result.status).toBe("conflicted");
+    expect(result.conflicts).toHaveLength(1);
+    expect(result.conflicts[0].conflictType).toBe("divergent_edit");
   });
 });

@@ -29,10 +29,23 @@ export interface ProjectConfig {
   lastSync?: string;
 }
 
+export type FileKind = "env" | "text";
+
+export interface ManifestSource {
+  machineName: string;
+  os: string;
+  projectPath: string;
+}
+
+export interface FileSource extends ManifestSource {
+  filePath: string;
+}
+
 export interface ProjectManifest {
   version: number;
   projectName: string;
   files: FileEntry[];
+  source?: ManifestSource;
 }
 
 export interface FileEntry {
@@ -40,6 +53,7 @@ export interface FileEntry {
   hash: string;
   size: number;
   updatedAt: string;
+  source?: FileSource;
 }
 
 export interface EncryptedData {
@@ -60,7 +74,7 @@ export const DEFAULT_B2_CONFIG = {
 // ============================================
 
 /**
- * Stores the "base" state of env files after the last successful sync.
+ * Stores the "base" state of files after the last successful sync.
  * Used for three-way merge to detect true conflicts vs auto-mergeable changes.
  */
 export interface BaseSnapshot {
@@ -105,8 +119,10 @@ export interface AutoMergeEntry {
 
 export interface FileMergeResult {
   fileName: string;
+  kind: FileKind;
   status: "clean" | "auto_merged" | "conflicted";
   merged: Map<string, string>;
+  mergedContent?: string | null;
   conflicts: ConflictEntry[];
   autoMerged: AutoMergeEntry[];
 }

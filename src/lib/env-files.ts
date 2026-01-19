@@ -1,8 +1,9 @@
 import { glob } from "glob";
 import { readFile, stat } from "node:fs/promises";
-import { basename, join } from "node:path";
+import { join, posix } from "node:path";
+import type { FileKind } from "../types/index.ts";
 
-export interface EnvFile {
+export interface ProjectFile {
   name: string;
   path: string;
   content: string;
@@ -10,28 +11,63 @@ export interface EnvFile {
   modifiedAt: Date;
 }
 
-export async function discoverEnvFiles(
+export function normalizeRelativePath(path: string): string | null {
+  const normalized = posix
+    .normalize(path.replace(/\\/g, "/"))
+    .replace(/^\.\/+/, "")
+    .trim();
+
+  if (!normalized || normalized === "." || normalized === "..") {
+    return null;
+  }
+
+  if (/^[a-zA-Z]:\//.test(normalized)) {
+    return null;
+  }
+
+  if (normalized.startsWith("../") || normalized.startsWith("/")) {
+    return null;
+  }
+
+  return normalized;
+}
+
+export function isEnvFile(fileName: string): boolean {
+  const baseName = fileName.replace(/\\/g, "/").split("/").pop() ?? fileName;
+  return baseName.startsWith(".env");
+}
+
+export function getFileKind(fileName: string): FileKind {
+  return isEnvFile(fileName) ? "env" : "text";
+}
+
+export async function discoverProjectFiles(
   projectDir: string,
   pattern: string,
   ignore: string[] = []
-): Promise<EnvFile[]> {
+): Promise<ProjectFile[]> {
   const matches = await glob(pattern, {
     cwd: projectDir,
     dot: true,
     nodir: true,
-    ignore: [...ignore, "node_modules/**", ".git/**"],
+    ignore: [...ignore, "node_modules/**", ".git/**", ".pss/**", ".pss.json"],
   });
 
-  const files: EnvFile[] = [];
+  const files: ProjectFile[] = [];
 
   for (const match of matches) {
-    const filePath = join(projectDir, match);
+    const normalizedName = normalizeRelativePath(match);
+    if (!normalizedName) {
+      continue;
+    }
+
+    const filePath = join(projectDir, normalizedName);
     try {
       const content = await readFile(filePath, "utf-8");
       const stats = await stat(filePath);
 
       files.push({
-        name: basename(match),
+        name: normalizedName,
         path: filePath,
         content,
         size: stats.size,

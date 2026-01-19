@@ -3,7 +3,7 @@ import { basename, join } from "node:path";
 import { readFile, writeFile, access } from "node:fs/promises";
 import chalk from "chalk";
 import { loadProjectConfig, saveProjectConfig } from "../lib/config.ts";
-import { discoverEnvFiles } from "../lib/env-files.ts";
+import { discoverProjectFiles } from "../lib/env-files.ts";
 import { ensurePssDir } from "../lib/base-snapshot.ts";
 import type { ProjectConfig } from "../types/index.ts";
 
@@ -14,6 +14,7 @@ export default class Init extends Command {
     "<%= config.bin %> init",
     "<%= config.bin %> init my-project",
     '<%= config.bin %> init --pattern ".env*"',
+    '<%= config.bin %> init --pattern "**/*.{env,json,yaml,yml}"',
     '<%= config.bin %> init --ignore ".env.example"',
   ];
 
@@ -27,7 +28,7 @@ export default class Init extends Command {
   static override flags = {
     pattern: Flags.string({
       char: "p",
-      description: "Glob pattern for .env files",
+      description: "Glob pattern for project files",
       default: ".env*",
     }),
     ignore: Flags.string({
@@ -56,7 +57,7 @@ export default class Init extends Command {
       return;
     }
 
-    const envFiles = await discoverEnvFiles(projectDir, flags.pattern, flags.ignore);
+    const projectFiles = await discoverProjectFiles(projectDir, flags.pattern, flags.ignore);
 
     const config: ProjectConfig = {
       version: 1,
@@ -76,16 +77,16 @@ export default class Init extends Command {
     this.log(chalk.green("✓") + ` Initialized project "${chalk.cyan(projectName)}"`);
     this.log("");
 
-    if (envFiles.length > 0) {
-      this.log("Found .env files:");
-      for (const file of envFiles) {
+    if (projectFiles.length > 0) {
+      this.log("Found files:");
+      for (const file of projectFiles) {
         this.log(`  ${chalk.dim("•")} ${file.name}`);
       }
       this.log("");
       this.log(`Run ${chalk.cyan("pss push")} to upload these files.`);
     } else {
       this.log(chalk.dim(`No files matching "${flags.pattern}" found yet.`));
-      this.log(`Create some .env files and run ${chalk.cyan("pss push")}.`);
+      this.log(`Create some files and run ${chalk.cyan("pss push")}.`);
     }
 
     this.log("");

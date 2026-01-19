@@ -7,16 +7,19 @@ import { loadProjectConfig, loadGlobalConfig, saveProjectConfig } from "../lib/c
 import { requireAuth } from "../lib/auth.ts";
 import { decrypt, getEncryptionKey, hashFile } from "../lib/crypto.ts";
 import { createB2Client, getStoragePath, getManifestPath } from "../lib/b2-client.ts";
-import { discoverEnvFiles } from "../lib/env-files.ts";
+import { discoverProjectFiles, normalizeRelativePath } from "../lib/env-files.ts";
 import { loadAllBaseContents, updateBaseSnapshot } from "../lib/base-snapshot.ts";
+import { ensureParentDir } from "../lib/fs-utils.ts";
+import { getManifestFingerprint } from "../lib/manifest.ts";
 import type { ProjectManifest, EncryptedData, BaseFileEntry } from "../types/index.ts";
 
 export default class Pull extends Command {
-  static override description = "Pull .env files from remote storage";
+  static override description = "Pull files from remote storage";
 
   static override examples = [
     "<%= config.bin %> pull",
     "<%= config.bin %> pull .env.local",
+    "<%= config.bin %> pull config/settings.json",
     "<%= config.bin %> pull --dry-run",
   ];
 
@@ -90,9 +93,18 @@ export default class Pull extends Command {
       let filesToPull = manifest.files;
 
       if (args.files) {
-        const filterNames = args.files.split(",").map((f) => f.trim());
+        const filterNames = normalizeFileArgs(args.files);
         filesToPull = filesToPull.filter((f) => filterNames.includes(f.name));
       }
+
+      filesToPull = filesToPull.filter((file) => {
+        const safeName = normalizeRelativePath(file.name);
+        if (!safeName || safeName !== file.name) {
+          this.warn(`Skipping unsafe remote file path: ${file.name}`);
+          return false;
+        }
+        return true;
+      });
 
       if (filesToPull.length === 0) {
         spinner.succeed("No files to pull");
@@ -102,7 +114,7 @@ export default class Pull extends Command {
       // Check if local has unpushed changes
       spinner.text = "Checking for local changes...";
       const baseContents = await loadAllBaseContents(projectDir);
-      const localFiles = await discoverEnvFiles(
+      const localFiles = await discoverProjectFiles(
         projectDir,
         projectConfig.pattern,
         projectConfig.ignore
@@ -174,6 +186,7 @@ export default class Pull extends Command {
         const content = await decrypt(encrypted, encryptionKey);
 
         const localPath = join(projectDir, file.name);
+        await ensureParentDir(localPath);
 
         if (flags.backup) {
           const { access, copyFile } = await import("node:fs/promises");
@@ -199,7 +212,7 @@ export default class Pull extends Command {
 
       // Update base snapshot to track what we pulled
       spinner.text = "Updating base snapshot...";
-      const manifestHash = await hashFile(JSON.stringify(manifest));
+      const manifestHash = await hashFile(getManifestFingerprint(manifest));
       await updateBaseSnapshot(projectDir, baseFiles, manifestHash);
 
       projectConfig.lastSync = new Date().toISOString();
@@ -217,4 +230,29 @@ function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes}B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)}KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)}MB`;
+}
+
+function normalizeFileArgs(input: string): string[] {
+  const values = input
+    .split(",")
+    .map((value) => value.trim())
+    .filter(Boolean);
+
+  const normalized: string[] = [];
+  const invalid: string[] = [];
+
+  for (const value of values) {
+    const normalizedValue = normalizeRelativePath(value);
+    if (!normalizedValue) {
+      invalid.push(value);
+    } else {
+      normalized.push(normalizedValue);
+    }
+  }
+
+  if (invalid.length > 0) {
+    throw new Error(`Invalid file path(s): ${invalid.join(", ")}`);
+  }
+
+  return normalized;
 }

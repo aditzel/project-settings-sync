@@ -185,6 +185,7 @@ export function threeWayMergeEnvFile(
 
   return {
     fileName,
+    kind: "env",
     status: conflicts.length > 0 ? "conflicted" : autoMerged.length > 0 ? "auto_merged" : "clean",
     merged,
     conflicts,
@@ -193,13 +194,98 @@ export function threeWayMergeEnvFile(
 }
 
 /**
+ * Perform a three-way merge of text file contents.
+ *
+ * @param base - The base version (last synced state), or null if first sync
+ * @param local - The local version
+ * @param remote - The remote version
+ * @returns FileMergeResult with merged content and any conflicts
+ */
+export function threeWayMergeTextFile(
+  fileName: string,
+  base: string | null,
+  local?: string,
+  remote?: string
+): FileMergeResult {
+  const conflicts: ConflictEntry[] = [];
+  const autoMerged: AutoMergeEntry[] = [];
+
+  const baseVal = base === null ? undefined : base;
+  const localVal = local;
+  const remoteVal = remote;
+
+  const result = mergeKey("content", baseVal, localVal, remoteVal);
+
+  let mergedContent: string | null = null;
+
+  if (result.type === "conflict") {
+    conflicts.push({
+      key: "content",
+      conflictType: result.conflictType,
+      baseValue: baseVal,
+      localValue: localVal,
+      remoteValue: remoteVal,
+    });
+    mergedContent = localVal ?? null;
+  } else if (result.type === "auto_merged") {
+    mergedContent = result.value ?? null;
+    autoMerged.push({
+      key: "content",
+      action: result.action,
+      value: result.value,
+    });
+  } else if (result.type === "unchanged") {
+    mergedContent = result.value ?? null;
+  }
+
+  return {
+    fileName,
+    kind: "text",
+    status: conflicts.length > 0 ? "conflicted" : autoMerged.length > 0 ? "auto_merged" : "clean",
+    merged: new Map(),
+    mergedContent,
+    conflicts,
+    autoMerged,
+  };
+}
+
+/**
  * Apply conflict resolutions to a merge result.
- * Returns the final merged content with all conflicts resolved.
+ * Updates the merge result with all conflicts resolved.
  */
 export function applyResolutions(
   mergeResult: FileMergeResult,
   resolutions: ConflictResolution[]
-): Map<string, string> {
+): void {
+  if (mergeResult.kind === "text") {
+    let resolved = mergeResult.mergedContent ?? null;
+
+    for (const resolution of resolutions) {
+      const conflict = mergeResult.conflicts.find((c) => c.key === resolution.key);
+      if (!conflict) continue;
+
+      switch (resolution.choice) {
+        case "local":
+          resolved = conflict.localValue ?? null;
+          break;
+        case "remote":
+          resolved = conflict.remoteValue ?? null;
+          break;
+        case "base":
+          resolved = conflict.baseValue ?? null;
+          break;
+        case "manual":
+          resolved = resolution.manualValue ?? null;
+          break;
+        case "skip":
+          break;
+      }
+    }
+
+    mergeResult.mergedContent = resolved;
+    return;
+  }
+
   const result = new Map(mergeResult.merged);
 
   for (const resolution of resolutions) {
@@ -241,7 +327,7 @@ export function applyResolutions(
     }
   }
 
-  return result;
+  mergeResult.merged = result;
 }
 
 /**
@@ -264,6 +350,30 @@ export function allConflictsResolved(
  */
 export function getAutoMergeSummary(mergeResult: FileMergeResult): string[] {
   const lines: string[] = [];
+
+  if (mergeResult.kind === "text") {
+    for (const entry of mergeResult.autoMerged) {
+      switch (entry.action) {
+        case "added_from_local":
+          lines.push("content added from local");
+          break;
+        case "added_from_remote":
+          lines.push("content added from remote");
+          break;
+        case "deleted":
+          lines.push("content deleted");
+          break;
+        case "updated_from_local":
+          lines.push("content updated from local");
+          break;
+        case "updated_from_remote":
+          lines.push("content updated from remote");
+          break;
+      }
+    }
+
+    return lines;
+  }
 
   for (const entry of mergeResult.autoMerged) {
     switch (entry.action) {

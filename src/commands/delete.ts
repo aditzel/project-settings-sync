@@ -4,6 +4,7 @@ import ora from "ora";
 import { loadProjectConfig, loadGlobalConfig } from "../lib/config.ts";
 import { requireAuth } from "../lib/auth.ts";
 import { createB2Client, getStoragePath, getManifestPath } from "../lib/b2-client.ts";
+import { normalizeRelativePath } from "../lib/env-files.ts";
 import type { ProjectManifest } from "../types/index.ts";
 
 export default class Delete extends Command {
@@ -88,7 +89,7 @@ export default class Delete extends Command {
       return;
     }
 
-    const filesToDelete = args.files!.split(",").map((f) => f.trim());
+    const filesToDelete = normalizeFileArgs(args.files!);
 
     if (!flags.force) {
       this.log(chalk.yellow("Files to delete from remote:"));
@@ -136,4 +137,29 @@ export default class Delete extends Command {
       this.error((error as Error).message);
     }
   }
+}
+
+function normalizeFileArgs(input: string): string[] {
+  const values = input
+    .split(",")
+    .map((value) => value.trim())
+    .filter(Boolean);
+
+  const normalized: string[] = [];
+  const invalid: string[] = [];
+
+  for (const value of values) {
+    const normalizedValue = normalizeRelativePath(value);
+    if (!normalizedValue) {
+      invalid.push(value);
+    } else {
+      normalized.push(normalizedValue);
+    }
+  }
+
+  if (invalid.length > 0) {
+    throw new Error(`Invalid file path(s): ${invalid.join(", ")}`);
+  }
+
+  return normalized;
 }

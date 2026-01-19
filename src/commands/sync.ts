@@ -1,11 +1,17 @@
 import { Command, Flags } from "@oclif/core";
 import { writeFile } from "node:fs/promises";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import chalk from "chalk";
 import ora from "ora";
 import { loadProjectConfig, loadGlobalConfig, saveProjectConfig } from "../lib/config.ts";
 import { requireAuth } from "../lib/auth.ts";
-import { discoverEnvFiles, parseEnvFile, serializeEnvFile } from "../lib/env-files.ts";
+import {
+  discoverProjectFiles,
+  parseEnvFile,
+  serializeEnvFile,
+  getFileKind,
+  normalizeRelativePath,
+} from "../lib/env-files.ts";
 import { encrypt, decrypt, getEncryptionKey, hashFile } from "../lib/crypto.ts";
 import { createB2Client, getStoragePath, getManifestPath } from "../lib/b2-client.ts";
 import {
@@ -15,11 +21,15 @@ import {
 } from "../lib/base-snapshot.ts";
 import {
   threeWayMergeEnvFile,
+  threeWayMergeTextFile,
   applyResolutions,
   resolveAllConflicts,
   getAutoMergeSummary,
   createSyncResult,
 } from "../lib/merge.ts";
+import { ensureParentDir } from "../lib/fs-utils.ts";
+import { getFileSource, getManifestSource } from "../lib/source-info.ts";
+import { getManifestFingerprint } from "../lib/manifest.ts";
 import type {
   ProjectManifest,
   EncryptedData,
@@ -28,7 +38,7 @@ import type {
 } from "../types/index.ts";
 
 export default class Sync extends Command {
-  static override description = "Intelligently sync .env files with remote, handling conflicts";
+  static override description = "Intelligently sync files with remote, handling conflicts";
 
   static override examples = [
     "<%= config.bin %> sync",
@@ -90,7 +100,7 @@ export default class Sync extends Command {
 
       // 1. Load all three versions: base, local, remote
       spinner.text = "Loading local files...";
-      const localFiles = await discoverEnvFiles(
+      const localFiles = await discoverProjectFiles(
         projectDir,
         projectConfig.pattern,
         projectConfig.ignore
@@ -120,11 +130,16 @@ export default class Sync extends Command {
 
       if (manifest) {
         for (const file of manifest.files) {
-          const storagePath = getStoragePath(auth.userId, projectConfig.projectName, file.name);
+          const safeName = normalizeRelativePath(file.name);
+          if (!safeName || safeName !== file.name) {
+            this.warn(`Skipping unsafe remote file path: ${file.name}`);
+            continue;
+          }
+          const storagePath = getStoragePath(auth.userId, projectConfig.projectName, safeName);
           try {
             const encrypted = await b2.downloadJson<EncryptedData>(storagePath);
             const content = await decrypt(encrypted, encryptionKey);
-            remoteContents.set(file.name, content);
+            remoteContents.set(safeName, content);
           } catch {
             // Skip files that can't be downloaded
           }
@@ -148,11 +163,22 @@ export default class Sync extends Command {
         const remoteContent = remoteContents.get(fileName);
         const baseContent = baseContents.get(fileName);
 
-        const localVars = localContent ? parseEnvFile(localContent) : new Map();
-        const remoteVars = remoteContent ? parseEnvFile(remoteContent) : new Map();
-        const baseVars = baseContent ? parseEnvFile(baseContent) : null;
+        const fileKind = getFileKind(fileName);
 
-        const result = threeWayMergeEnvFile(fileName, baseVars, localVars, remoteVars);
+        const result =
+          fileKind === "env"
+            ? threeWayMergeEnvFile(
+                fileName,
+                baseContent !== undefined ? parseEnvFile(baseContent) : null,
+                localContent ? parseEnvFile(localContent) : new Map(),
+                remoteContent ? parseEnvFile(remoteContent) : new Map()
+              )
+            : threeWayMergeTextFile(
+                fileName,
+                baseContent !== undefined ? baseContent : null,
+                localContent,
+                remoteContent
+              );
         mergeResults.push(result);
       }
 
@@ -172,7 +198,7 @@ export default class Sync extends Command {
           this.log(chalk.dim("Resolving all conflicts using local values (--ours)"));
           for (const result of mergeResults) {
             const resolutions = resolveAllConflicts(result, "local");
-            result.merged = applyResolutions(result, resolutions);
+            applyResolutions(result, resolutions);
             result.conflicts = [];
             result.status = result.autoMerged.length > 0 ? "auto_merged" : "clean";
           }
@@ -180,7 +206,7 @@ export default class Sync extends Command {
           this.log(chalk.dim("Resolving all conflicts using remote values (--theirs)"));
           for (const result of mergeResults) {
             const resolutions = resolveAllConflicts(result, "remote");
-            result.merged = applyResolutions(result, resolutions);
+            applyResolutions(result, resolutions);
             result.conflicts = [];
             result.status = result.autoMerged.length > 0 ? "auto_merged" : "clean";
           }
@@ -194,19 +220,21 @@ export default class Sync extends Command {
               this.log("");
               this.log(chalk.bold(`  ${result.fileName}: ${conflict.key}`));
               this.log(chalk.dim(`    Type: ${conflict.conflictType}`));
-              if (conflict.baseValue !== undefined) {
-                this.log(chalk.dim(`    Base:   ${conflict.baseValue}`));
-              }
-              if (conflict.localValue !== undefined) {
-                this.log(chalk.green(`    Local:  ${conflict.localValue}`));
-              } else {
-                this.log(chalk.red(`    Local:  (deleted)`));
-              }
-              if (conflict.remoteValue !== undefined) {
-                this.log(chalk.blue(`    Remote: ${conflict.remoteValue}`));
-              } else {
-                this.log(chalk.red(`    Remote: (deleted)`));
-              }
+              const baseLine = formatConflictValue(result, conflict.baseValue);
+              const localLine = formatConflictValue(result, conflict.localValue);
+              const remoteLine = formatConflictValue(result, conflict.remoteValue);
+
+              this.log(chalk.dim(`    Base:   ${baseLine}`));
+              this.log(
+                (conflict.localValue === undefined ? chalk.red : chalk.green)(
+                  `    Local:  ${localLine}`
+                )
+              );
+              this.log(
+                (conflict.remoteValue === undefined ? chalk.red : chalk.blue)(
+                  `    Remote: ${remoteLine}`
+                )
+              );
             }
           }
           this.log("");
@@ -239,13 +267,14 @@ export default class Sync extends Command {
 
       // Write merged files locally
       for (const result of mergeResults) {
-        if (result.merged.size === 0) {
+        const content = getMergedContent(result);
+        if (content === null) {
           // File was deleted - we don't delete local files automatically
           continue;
         }
 
-        const content = serializeEnvFile(result.merged);
         const localPath = join(projectDir, result.fileName);
+        await ensureParentDir(localPath);
         await writeFile(localPath, content);
       }
 
@@ -254,17 +283,17 @@ export default class Sync extends Command {
       const newManifest: ProjectManifest = {
         version: 1,
         projectName: projectConfig.projectName,
+        source: getManifestSource(projectDir),
         files: [],
       };
 
       const baseFiles: BaseFileEntry[] = [];
 
       for (const result of mergeResults) {
-        if (result.merged.size === 0) {
+        const content = getMergedContent(result);
+        if (content === null) {
           continue;
         }
-
-        const content = serializeEnvFile(result.merged);
         const hash = await hashFile(content);
 
         spinner.text = `Uploading ${result.fileName}...`;
@@ -277,6 +306,7 @@ export default class Sync extends Command {
           hash,
           size: content.length,
           updatedAt: new Date().toISOString(),
+          source: getFileSource(projectDir, resolve(projectDir, result.fileName)),
         });
 
         baseFiles.push({
@@ -292,7 +322,7 @@ export default class Sync extends Command {
 
       // Update base snapshot
       spinner.text = "Updating base snapshot...";
-      const manifestHash = await hashFile(JSON.stringify(newManifest));
+      const manifestHash = await hashFile(getManifestFingerprint(newManifest));
       await updateBaseSnapshot(projectDir, baseFiles, manifestHash);
 
       // Update project config
@@ -336,4 +366,33 @@ export default class Sync extends Command {
       }
     }
   }
+}
+
+function getMergedContent(result: FileMergeResult): string | null {
+  if (result.kind === "env") {
+    if (result.merged.size === 0) {
+      return null;
+    }
+    return serializeEnvFile(result.merged);
+  }
+
+  return result.mergedContent ?? null;
+}
+
+function formatConflictValue(result: FileMergeResult, value: string | undefined): string {
+  if (value === undefined) {
+    return "(deleted)";
+  }
+
+  if (result.kind === "env") {
+    return value;
+  }
+
+  if (value.length === 0) {
+    return "(empty)";
+  }
+
+  const firstLine = value.split("\n")[0];
+  const needsSuffix = value.includes("\n") || firstLine.length < value.length;
+  return `${firstLine}${needsSuffix ? "..." : ""} (${value.length} chars)`;
 }

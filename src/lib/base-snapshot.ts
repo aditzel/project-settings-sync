@@ -1,6 +1,7 @@
 import { join } from "node:path";
 import { mkdir, readFile, writeFile, rm } from "node:fs/promises";
 import { existsSync } from "node:fs";
+import { ensureParentDir } from "./fs-utils.ts";
 import type { BaseSnapshot, BaseFileEntry } from "../types/index.ts";
 
 const PSS_DIR = ".pss";
@@ -104,6 +105,7 @@ export async function saveBaseFileContent(
 ): Promise<void> {
   await ensurePssDir(projectDir);
   const filePath = getBaseFilePath(projectDir, fileName);
+  await ensureParentDir(filePath);
   await writeFile(filePath, content);
 }
 

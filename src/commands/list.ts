@@ -2,7 +2,7 @@ import { Command, Args, Flags } from "@oclif/core";
 import chalk from "chalk";
 import { loadProjectConfig, loadGlobalConfig } from "../lib/config.ts";
 import { getAuthData } from "../lib/auth.ts";
-import { discoverEnvFiles } from "../lib/env-files.ts";
+import { discoverProjectFiles } from "../lib/env-files.ts";
 import { createB2Client, getManifestPath } from "../lib/b2-client.ts";
 import type { ProjectManifest } from "../types/index.ts";
 
@@ -69,7 +69,7 @@ export default class List extends Command {
     }
 
     const localFiles = !flags.remote
-      ? await discoverEnvFiles(
+      ? await discoverProjectFiles(
           projectDir,
           projectConfig?.pattern || ".env*",
           projectConfig?.ignore || []

@@ -2,9 +2,15 @@ import { Command, Args, Flags } from "@oclif/core";
 import chalk from "chalk";
 import { loadProjectConfig, loadGlobalConfig } from "../lib/config.ts";
 import { requireAuth } from "../lib/auth.ts";
-import { discoverEnvFiles, parseEnvFile, diffEnvFiles } from "../lib/env-files.ts";
+import {
+  discoverProjectFiles,
+  parseEnvFile,
+  diffEnvFiles,
+  isEnvFile,
+  normalizeRelativePath,
+} from "../lib/env-files.ts";
 import { createB2Client, getStoragePath, getManifestPath } from "../lib/b2-client.ts";
-import { decrypt, getEncryptionKey } from "../lib/crypto.ts";
+import { decrypt, getEncryptionKey, hashFile } from "../lib/crypto.ts";
 import type { ProjectManifest, EncryptedData } from "../types/index.ts";
 
 export default class Diff extends Command {
@@ -59,14 +65,20 @@ export default class Diff extends Command {
       return;
     }
 
-    let localFiles = await discoverEnvFiles(
+    let localFiles = await discoverProjectFiles(
       projectDir,
       projectConfig.pattern,
       projectConfig.ignore
     );
 
-    if (args.file) {
-      localFiles = localFiles.filter((f) => f.name === args.file);
+    const normalizedFile = args.file ? normalizeRelativePath(args.file) : null;
+
+    if (args.file && !normalizedFile) {
+      this.error(`Invalid file path: ${args.file}`);
+    }
+
+    if (normalizedFile) {
+      localFiles = localFiles.filter((f) => f.name === normalizedFile);
       if (localFiles.length === 0) {
         this.error(`Local file not found: ${args.file}`);
       }
@@ -80,6 +92,18 @@ export default class Diff extends Command {
       if (!remoteEntry) {
         this.log(chalk.yellow(`${localFile.name}: only exists locally`));
         hasDiff = true;
+        continue;
+      }
+
+      if (!isEnvFile(localFile.name)) {
+        const localHash = await hashFile(localFile.content);
+        if (localHash === remoteEntry.hash) {
+          this.log(chalk.green(`${localFile.name}: in sync ✓`));
+        } else {
+          hasDiff = true;
+          this.log(chalk.bold(`\n${localFile.name}:`));
+          this.log(chalk.yellow("  Content differs"));
+        }
         continue;
       }
 
@@ -142,7 +166,7 @@ export default class Diff extends Command {
 
     for (const remoteFile of manifest.files) {
       const hasLocal = localFiles.some((l) => l.name === remoteFile.name);
-      if (!hasLocal && (!args.file || args.file === remoteFile.name)) {
+      if (!hasLocal && (!normalizedFile || normalizedFile === remoteFile.name)) {
         this.log(chalk.blue(`${remoteFile.name}: only exists remotely`));
         hasDiff = true;
       }
