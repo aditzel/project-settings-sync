@@ -1,4 +1,4 @@
-import { Command, Args, Flags } from "@oclif/core";
+import { Command, Args, Flags, ux } from "@oclif/core";
 import { basename, join } from "node:path";
 import { readFile, writeFile, access } from "node:fs/promises";
 import chalk from "chalk";
@@ -29,7 +29,6 @@ export default class Init extends Command {
     pattern: Flags.string({
       char: "p",
       description: "Glob pattern for project files",
-      default: ".env*",
     }),
     ignore: Flags.string({
       char: "i",
@@ -57,12 +56,13 @@ export default class Init extends Command {
       return;
     }
 
-    const projectFiles = await discoverProjectFiles(projectDir, flags.pattern, flags.ignore);
+    const pattern = await this.resolvePattern(flags.pattern);
+    const projectFiles = await discoverProjectFiles(projectDir, pattern, flags.ignore);
 
     const config: ProjectConfig = {
       version: 1,
       projectName,
-      pattern: flags.pattern,
+      pattern,
       ignore: flags.ignore,
     };
 
@@ -85,7 +85,7 @@ export default class Init extends Command {
       this.log("");
       this.log(`Run ${chalk.cyan("pss push")} to upload these files.`);
     } else {
-      this.log(chalk.dim(`No files matching "${flags.pattern}" found yet.`));
+      this.log(chalk.dim(`No files matching "${pattern}" found yet.`));
       this.log(`Create some files and run ${chalk.cyan("pss push")}.`);
     }
 
@@ -129,5 +129,24 @@ export default class Init extends Command {
     await writeFile(gitignorePath, newContent);
 
     return true;
+  }
+
+  private async resolvePattern(pattern?: string): Promise<string> {
+    if (pattern) {
+      return pattern;
+    }
+
+    const defaultPattern = ".env*";
+    const extendedPattern = "{**/.env*,**/*.{json,yaml,yml}}";
+
+    const isInteractive = Boolean(process.stdin.isTTY && process.stdout.isTTY);
+    if (!isInteractive || process.env.CI) {
+      return defaultPattern;
+    }
+
+    const includeStructured = await ux.confirm(
+      "Include JSON/YAML files in sync? (y/N)"
+    );
+    return includeStructured ? extendedPattern : defaultPattern;
   }
 }
