@@ -1,6 +1,7 @@
-import { Command, Args, Flags, ux } from "@oclif/core";
+import { Command, Args, Flags } from "@oclif/core";
 import { basename, join } from "node:path";
 import { readFile, writeFile, access } from "node:fs/promises";
+import { createInterface } from "node:readline";
 import chalk from "chalk";
 import { loadProjectConfig, saveProjectConfig } from "../lib/config.ts";
 import { discoverProjectFiles } from "../lib/env-files.ts";
@@ -144,9 +145,29 @@ export default class Init extends Command {
       return defaultPattern;
     }
 
-    const includeStructured = await ux.confirm(
-      "Include JSON/YAML files in sync? (y/N)"
-    );
+    const includeStructured = await promptConfirm("Include JSON/YAML files in sync?");
     return includeStructured ? extendedPattern : defaultPattern;
   }
+}
+
+function promptConfirm(question: string, defaultValue = false): Promise<boolean> {
+  const rl = createInterface({
+    input: process.stdin,
+    output: process.stdout,
+  });
+
+  const suffix = defaultValue ? " (Y/n)" : " (y/N)";
+  const prompt = `${question}${suffix} `;
+
+  return new Promise((resolve) => {
+    rl.question(prompt, (answer) => {
+      rl.close();
+      const normalized = answer.trim().toLowerCase();
+      if (!normalized) {
+        resolve(defaultValue);
+        return;
+      }
+      resolve(normalized === "y" || normalized === "yes");
+    });
+  });
 }

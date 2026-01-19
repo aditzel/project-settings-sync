@@ -392,7 +392,7 @@ function formatConflictValue(result: FileMergeResult, value: string | undefined)
     return "(empty)";
   }
 
-  const firstLine = value.split("\n")[0];
+  const [firstLine = ""] = value.split("\n");
   const needsSuffix = value.includes("\n") || firstLine.length < value.length;
   return `${firstLine}${needsSuffix ? "..." : ""} (${value.length} chars)`;
 }
