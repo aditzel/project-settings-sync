@@ -50,7 +50,7 @@ jobs:
           name: native-macos-${{ github.run_id }}-${{ github.run_attempt }}
           path: ${{ runner.temp }}/native-macos-source-${{ github.run_id }}-${{ github.run_attempt }}/source.json
           if-no-files-found: error
-          retention-days: 2
+          retention-days: 36
           overwrite: false
 
       - name: Install dependencies

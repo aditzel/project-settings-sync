@@ -49,11 +49,28 @@ GitHub documents that `pull_request` normally tests its merge ref, while the PR
 head SHA identifies the source branch. [Event semantics](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#pull_request)
 
 The pinned official `actions/upload-artifact` v4.6.2 creates
-`native-macos-<runId>-<runAttempt>`, containing only `source.json`, with two-day
+`native-macos-<runId>-<runAttempt>`, containing only `source.json`, with 36-day
 retention, `overwrite: false`, and missing-file failure. The local output is also
 created exclusively. Upload-artifact v4 artifacts are immutable after creation;
 the capture is uploaded before project code can change the local file.
 [Upload behavior](https://github.com/actions/upload-artifact/tree/ea165f8d65b6e75b540449e92b4886f43607fa02)
+
+The retention window covers GitHub's documented 35-day workflow limit, including
+waiting and approvals, with one day of margin. A two-day artifact could expire
+while a valid dependent Linux job is still queued. This only extends retention
+of the bounded, non-secret identity record; it does not change job timeouts,
+triggers, dependencies, runner routing or artifact contents.
+[Workflow limits](https://docs.github.com/en/actions/reference/limits)
+
+The repository's artifact-retention setting can cap the requested duration.
+Commissioning must check the actual artifact API `created_at` and `expires_at`
+values and confirm at least 35 days of effective retention. The extra requested
+day accommodates upload/finalization timing; metadata timestamps alone still do
+not establish producer ordering. Existing artifacts keep their original expiry.
+The protected consumer must separately review and pin the changed workflow blob;
+this workflow change cannot approve its own use on Janus. Deleted, expired,
+replaced or stale evidence must still be rejected at admission, and delays beyond
+the original workflow window remain outside this retention guarantee.
 
 ## Contract for the future trusted controller
 
