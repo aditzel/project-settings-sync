@@ -1,0 +1,34 @@
+# Shadow reference only; the image-owned Janus manifest supplies trusted steps.
+# Pipeline: project-settings-sync-shadow-ci; bootstrap: janus-ci bootstrap.
+# Push main and same-repository pull requests targeting main; forks stay hosted.
+# Actions remains authoritative, including native macOS tests and build gating.
+steps:
+  - label: ":linux: Shadow Linux checks"
+    key: test-linux
+    command: janus-ci test-linux
+    agents:
+      queue: janus-linux
+    timeout_in_minutes: 360
+
+  - block: Wait for verified native macOS
+    key: native-macos
+    blocked_state: running
+    prompt: Managed by the native verifier. Manual unblocking cannot authorize repository execution.
+    fields:
+      - text: Native evidence decision
+        key: janus-native-macos-block-v1
+    depends_on:
+      - test-linux
+    allow_dependency_failure: false
+
+  - label: ":package: Shadow Linux build"
+    key: build-linux
+    command: janus-ci build-linux
+    depends_on:
+      - test-linux
+      - native-macos
+    allow_dependency_failure: false
+    agents:
+      queue: janus-linux
+    # 360-minute command budget plus bounded native-result freshness validation.
+    timeout_in_minutes: 361
