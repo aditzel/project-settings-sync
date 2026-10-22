@@ -76,7 +76,8 @@ Please add tests for any new features or bug fixes.
 ### PR Guidelines
 
 - Keep PRs focused on a single feature or fix
-- Write clear commit messages
+- Write clear commit messages using [Conventional Commits](https://www.conventionalcommits.org/) (e.g., `fix(sync): preserve local edits on conflict`), and use the same format for PR titles
+- If a coding agent contributed to a commit, add a `Co-authored-by:` trailer for that agent
 - Reference any related issues
 - Be responsive to feedback
 

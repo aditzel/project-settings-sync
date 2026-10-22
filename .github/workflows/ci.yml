@@ -9,11 +9,16 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 # Keep automatic checks until the protected Janus pipelines are commissioned.
 # Review fork workflow changes before approving: routing is not a runner access boundary.
 jobs:
   test:
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 360
     strategy:
       matrix:
         os: [ubuntu-24.04, macos-latest]
@@ -71,6 +76,7 @@ jobs:
   build:
     runs-on: ubuntu-24.04
     needs: test
+    timeout-minutes: 360
 
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
