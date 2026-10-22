@@ -1,6 +1,12 @@
 # dependencies (bun install)
 node_modules
 
+# foreign JS lockfiles (bun.lock is authoritative)
+package-lock.json
+npm-shrinkwrap.json
+yarn.lock
+pnpm-lock.yaml
+
 # output
 out
 dist
