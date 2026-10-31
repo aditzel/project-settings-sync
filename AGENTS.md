@@ -30,6 +30,8 @@
 
 ## Commit & Pull Request Guidelines
 - Commit history favors short, imperative summaries (e.g., "Add sync command with three-way merge").
+- For new commits and PR titles, use Conventional Commits with that same short imperative summary (e.g., `fix(sync): preserve local edits on conflict`). Existing history is not rewritten.
+- When a coding agent contributes to a commit, add a `Co-authored-by:` trailer for that agent (e.g., `Co-authored-by: factory-droid[bot] <138933559+factory-droid[bot]@users.noreply.github.com>`).
 - Keep PRs focused, link related issues, and describe behavior changes clearly.
 - Before opening a PR: run `bun run test`, `bun run lint`, and `bun run typecheck`.
 - Update docs (README/CONTRIBUTING) when user-facing behavior changes.
