@@ -8,7 +8,7 @@ steps:
     command: janus-ci test-linux
     agents:
       queue: janus-linux
-    timeout_in_minutes: 360
+    timeout_in_minutes: 20
 
   - block: Wait for verified native macOS
     key: native-macos
@@ -30,5 +30,5 @@ steps:
     allow_dependency_failure: false
     agents:
       queue: janus-linux
-    # 360-minute command budget plus bounded native-result freshness validation.
-    timeout_in_minutes: 361
+    # 15-minute command budget plus bounded native-result freshness validation.
+    timeout_in_minutes: 16

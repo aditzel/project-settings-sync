@@ -23,6 +23,7 @@ case "$1" in
     bun run typecheck
     bun run lint
     bun run format:check
+    python3 -I scripts/test-ci-status-bridge.py
     bun test
     ;;
   build-linux)
